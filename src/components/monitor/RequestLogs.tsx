@@ -627,8 +627,8 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
                       <th>{t('monitor.logs.header_latency')}</th>
                       <th>{t('monitor.logs.header_input')}</th>
                       <th>{t('monitor.logs.header_output')}</th>
-                      <th>{t('usage_stats.reasoning')}</th>
-                      <th>{t('usage_stats.cached')}</th>
+                      <th>{t('usage_stats.reasoning_tokens')}</th>
+                      <th>{t('usage_stats.cached_tokens')}</th>
                       <th>{t('monitor.logs.header_total')}</th>
                       <th>{t('monitor.logs.header_time')}</th>
                       <th>{t('monitor.logs.header_actions')}</th>
