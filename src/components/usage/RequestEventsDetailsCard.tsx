@@ -434,8 +434,8 @@ export function RequestEventsDetailsCard({
                   <th>{getHeaderText('usage_stats.request_events_result', '结果')}</th>
                   <th>{getHeaderText('usage_stats.input_tokens', '输入 Tokens')}</th>
                   <th>{getHeaderText('usage_stats.output_tokens', '输出 Tokens')}</th>
-                  <th>{getHeaderText('usage_stats.reasoning_tokens', '思考 Tokens')}</th>
-                  <th>{getHeaderText('usage_stats.cached_tokens', '缓存 Tokens')}</th>
+                  <th>{getHeaderText('usage_stats.reasoning_tokens', '思考')}</th>
+                  <th>{getHeaderText('usage_stats.cached_tokens', '缓存')}</th>
                   <th>{getHeaderText('usage_stats.total_tokens', '总 Token')}</th>
                 </tr>
               </thead>
