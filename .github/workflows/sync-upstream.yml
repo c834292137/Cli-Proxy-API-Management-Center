@@ -1,0 +1,135 @@
+name: Sync Upstream and Tag
+
+on:
+  schedule:
+    # UTC 08:00 = Beijing 16:00, daily
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+
+    env:
+      CUSTOM_BRANCH: feat/ai-provider-cards-and-naming
+      UPSTREAM_REMOTE: upstream
+      UPSTREAM_BRANCH: main
+      TAG_SUFFIX: cpa
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CUSTOM_BRANCH }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Add upstream remote
+        run: |
+          git remote add $UPSTREAM_REMOTE https://github.com/router-for-me/Cli-Proxy-API-Management-Center.git
+          git fetch $UPSTREAM_REMOTE $UPSTREAM_BRANCH --tags
+
+      - name: Check for new upstream commits
+        id: check
+        run: |
+          LOCAL_HEAD=$(git rev-parse HEAD)
+          UPSTREAM_HEAD=$(git rev-parse $UPSTREAM_REMOTE/$UPSTREAM_BRANCH)
+          MERGE_BASE=$(git merge-base HEAD $UPSTREAM_REMOTE/$UPSTREAM_BRANCH)
+
+          if [ "$MERGE_BASE" = "$UPSTREAM_HEAD" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No new upstream commits, skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "New upstream commits detected: $MERGE_BASE..$UPSTREAM_HEAD"
+          fi
+
+      - name: Merge upstream
+        if: steps.check.outputs.skip == 'false'
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git merge $UPSTREAM_REMOTE/$UPSTREAM_BRANCH --no-edit; then
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create issue on conflict
+        if: steps.merge.outputs.conflict == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'sync-conflict',
+              per_page: 1
+            });
+            if (existing.data.length > 0) {
+              console.log('Conflict issue already exists, skipping.');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Upstream sync conflict - manual merge required',
+              body: [
+                'Auto-sync from `upstream/main` failed due to merge conflicts.',
+                '',
+                '**Steps to resolve:**',
+                '```bash',
+                'git fetch origin',
+                `git checkout ${process.env.CUSTOM_BRANCH}`,
+                'git pull',
+                'git fetch origin main',
+                'git merge origin/main',
+                '# resolve conflicts manually',
+                'git add .',
+                'git commit',
+                'git push',
+                '```',
+                '',
+                'After resolving, manually trigger the **Sync Upstream and Tag** workflow or wait for the next scheduled run.',
+                '',
+                `Run: [${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              ].join('\n'),
+              labels: ['sync-conflict']
+            });
+
+      - name: Compute next tag
+        if: steps.merge.outputs.conflict == 'false' && steps.check.outputs.skip == 'false'
+        id: tag
+        run: |
+          # Find latest upstream version tag (exclude cpa tags)
+          UPSTREAM_TAG=$(git tag --list 'v*' --sort=-v:refname | grep -v "$TAG_SUFFIX" | head -n 1)
+          echo "Upstream latest tag: $UPSTREAM_TAG"
+
+          # Find latest cpa tag for this upstream version
+          LATEST_CPA=$(git tag --list "${UPSTREAM_TAG}-${TAG_SUFFIX}.*" --sort=-v:refname | head -n 1)
+
+          if [ -z "$LATEST_CPA" ]; then
+            NEXT_NUM=1
+          else
+            CURRENT_NUM=$(echo "$LATEST_CPA" | grep -oP '\.(\d+)$' | tr -d '.')
+            NEXT_NUM=$((CURRENT_NUM + 1))
+          fi
+
+          NEXT_TAG="${UPSTREAM_TAG}-${TAG_SUFFIX}.${NEXT_NUM}"
+          echo "next_tag=$NEXT_TAG" >> "$GITHUB_OUTPUT"
+          echo "Next tag: $NEXT_TAG"
+
+      - name: Push merge and tag
+        if: steps.merge.outputs.conflict == 'false' && steps.check.outputs.skip == 'false'
+        run: |
+          git tag ${{ steps.tag.outputs.next_tag }}
+          git push origin $CUSTOM_BRANCH
+          git push origin ${{ steps.tag.outputs.next_tag }}
+          echo "Pushed ${{ steps.tag.outputs.next_tag }}, release workflow should trigger."
