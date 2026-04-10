@@ -25,7 +25,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TARGET_TAG="${{ inputs.tag }}"
           else
-            TARGET_TAG="${{ steps.target.outputs.tag }}"
+            TARGET_TAG="${{ github.ref_name }}"
           fi
 
           echo "tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
@@ -59,9 +59,11 @@ jobs:
           ls -lh management.html
 
       - name: Generate release notes
+        env:
+          CURRENT_TAG: ${{ steps.target.outputs.tag }}
         run: |
           set -euo pipefail
-          current_tag="${GITHUB_REF_NAME}"
+          current_tag="$CURRENT_TAG"
           previous_tag="$(git tag --list 'v*' --sort=-v:refname | grep -v "^${current_tag}$" | head -n 1 || true)"
           if [ -n "${previous_tag}" ]; then
             range="${previous_tag}..${current_tag}"
@@ -75,6 +77,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.target.outputs.tag }}
           files: dist/management.html
           body_path: release-notes.md
           draft: false

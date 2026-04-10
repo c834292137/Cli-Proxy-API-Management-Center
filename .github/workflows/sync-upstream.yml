@@ -79,6 +79,7 @@ jobs:
         if: steps.merge.outputs.conflict == 'true'
         env:
           UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+          CUSTOM_BRANCH: ${{ env.CUSTOM_BRANCH }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -154,5 +155,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run release.yml -f tag=${{ steps.tag.outputs.next_tag }}
+          gh workflow run release.yml --ref "$CUSTOM_BRANCH" -f tag=${{ steps.tag.outputs.next_tag }}
           echo "Triggered release workflow for ${{ steps.tag.outputs.next_tag }}."
