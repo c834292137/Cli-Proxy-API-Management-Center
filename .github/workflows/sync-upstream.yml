@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      actions: write
 
     env:
       CUSTOM_BRANCH: feat/ai-provider-cards-and-naming
@@ -146,4 +147,12 @@ jobs:
           git tag ${{ steps.tag.outputs.next_tag }}
           git push origin $CUSTOM_BRANCH
           git push origin ${{ steps.tag.outputs.next_tag }}
-          echo "Pushed ${{ steps.tag.outputs.next_tag }}, release workflow should trigger."
+          echo "Pushed ${{ steps.tag.outputs.next_tag }}."
+
+      - name: Trigger release workflow
+        if: steps.merge.outputs.conflict == 'false' && steps.check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run release.yml -f tag=${{ steps.tag.outputs.next_tag }}
+          echo "Triggered release workflow for ${{ steps.tag.outputs.next_tag }}."

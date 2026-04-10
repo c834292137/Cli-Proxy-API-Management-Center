@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        type: string
 
 jobs:
   build-and-release:
@@ -13,9 +19,22 @@ jobs:
       contents: write
 
     steps:
+      - name: Resolve release target
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET_TAG="${{ inputs.tag }}"
+          else
+            TARGET_TAG="${{ steps.target.outputs.tag }}"
+          fi
+
+          echo "tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: $TARGET_TAG"
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.target.outputs.tag }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -31,7 +50,7 @@ jobs:
       - name: Build all-in-one HTML
         run: npm run build
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ steps.target.outputs.tag }}
 
       - name: Prepare release assets
         run: |
