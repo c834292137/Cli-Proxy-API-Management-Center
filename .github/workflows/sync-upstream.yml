@@ -52,10 +52,16 @@ jobs:
         run: |
           UPSTREAM_TAG="${{ steps.upstream.outputs.tag }}"
           UPSTREAM_TAG_COMMIT="${{ steps.upstream.outputs.commit }}"
+          LATEST_CPA=$(git tag --list "${UPSTREAM_TAG}-${TAG_SUFFIX}.*" --sort=-v:refname | head -n 1)
 
           if git merge-base --is-ancestor "$UPSTREAM_TAG_COMMIT" HEAD; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Current branch already contains $UPSTREAM_TAG ($UPSTREAM_TAG_COMMIT), skipping."
+            if [ -n "$LATEST_CPA" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Current branch already contains $UPSTREAM_TAG and existing CPA tag $LATEST_CPA, skipping."
+            else
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              echo "Current branch already contains $UPSTREAM_TAG but no CPA tag exists yet, will create one."
+            fi
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "New upstream release detected: $UPSTREAM_TAG ($UPSTREAM_TAG_COMMIT)"
@@ -150,10 +156,3 @@ jobs:
           git push origin ${{ steps.tag.outputs.next_tag }}
           echo "Pushed ${{ steps.tag.outputs.next_tag }}."
 
-      - name: Trigger release workflow
-        if: steps.merge.outputs.conflict == 'false' && steps.check.outputs.skip == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh workflow run release.yml --ref "$CUSTOM_BRANCH" -f tag=${{ steps.tag.outputs.next_tag }}
-          echo "Triggered release workflow for ${{ steps.tag.outputs.next_tag }}."
