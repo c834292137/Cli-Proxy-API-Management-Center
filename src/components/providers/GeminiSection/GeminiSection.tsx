@@ -16,6 +16,7 @@ import {
   type UsageDetailsBySource,
 } from '@/utils/usageIndex';
 import styles from '@/pages/AiProvidersPage.module.scss';
+import { CollapsibleModelTags } from '../CollapsibleModelTags';
 import { ProviderList } from '../ProviderList';
 import { ProviderStatusBar } from '../ProviderStatusBar';
 import { getStatsBySource, hasDisableAllModelsRule } from '../utils';
@@ -169,33 +170,17 @@ export function GeminiSection({
                   </div>
                 )}
                 {item.models?.length ? (
-                  <div className={styles.modelTagList}>
-                    <span className={styles.modelCountLabel}>
-                      {t('ai_providers.gemini_models_count')}: {item.models.length}
-                    </span>
-                    {item.models.map((model) => (
-                      <span key={model.name} className={styles.modelTag}>
-                        <span className={styles.modelName}>{model.name}</span>
-                        {model.alias && model.alias !== model.name && (
-                          <span className={styles.modelAlias}>{model.alias}</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
+                  <CollapsibleModelTags
+                    models={item.models}
+                    countLabel={`${t('ai_providers.gemini_models_count')}: ${item.models.length}`}
+                  />
                 ) : null}
                 {excludedModels.length ? (
-                  <div className={styles.excludedModelsSection}>
-                    <div className={styles.excludedModelsLabel}>
-                      {t('ai_providers.excluded_models_count', { count: excludedModels.length })}
-                    </div>
-                    <div className={styles.modelTagList}>
-                      {excludedModels.map((model) => (
-                        <span key={model} className={`${styles.modelTag} ${styles.excludedModelTag}`}>
-                          <span className={styles.modelName}>{model}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <CollapsibleModelTags
+                    models={excludedModels.map((m) => ({ name: m }))}
+                    countLabel={t('ai_providers.excluded_models_count', { count: excludedModels.length })}
+                    variant="excluded"
+                  />
                 ) : null}
                 <div className={styles.cardStats}>
                   <span className={`${styles.statPill} ${styles.statSuccess}`}>

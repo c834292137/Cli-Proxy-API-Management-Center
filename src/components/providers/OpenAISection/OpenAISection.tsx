@@ -14,6 +14,7 @@ import {
 } from '@/utils/usage';
 import { collectUsageDetailsForCandidates, type UsageDetailsBySource } from '@/utils/usageIndex';
 import styles from '@/pages/AiProvidersPage.module.scss';
+import { CollapsibleModelTags } from '../CollapsibleModelTags';
 import { ProviderList } from '../ProviderList';
 import { ProviderStatusBar } from '../ProviderStatusBar';
 import { getOpenAIProviderStats, getStatsBySource } from '../utils';
@@ -178,16 +179,7 @@ export function OpenAISection({
                   <span className={styles.fieldValue}>{item.models?.length || 0}</span>
                 </div>
                 {item.models?.length ? (
-                  <div className={styles.modelTagList}>
-                    {item.models.map((model) => (
-                      <span key={model.name} className={styles.modelTag}>
-                        <span className={styles.modelName}>{model.name}</span>
-                        {model.alias && model.alias !== model.name && (
-                          <span className={styles.modelAlias}>{model.alias}</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
+                  <CollapsibleModelTags models={item.models} />
                 ) : null}
                 {item.testModel && (
                   <div className={styles.fieldRow}>
