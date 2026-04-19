@@ -6,25 +6,24 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import iconClaude from '@/assets/icons/claude.svg';
 import type { ProviderKeyConfig } from '@/types';
 import { maskApiKey } from '@/utils/format';
-import {
-  buildCandidateUsageSourceIds,
-  calculateStatusBarData,
-  type KeyStats,
-} from '@/utils/usage';
-import {
-  collectUsageDetailsForCandidates,
-  type UsageDetailsBySource,
-} from '@/utils/usageIndex';
+import { calculateStatusBarData, type KeyStats } from '@/utils/usage';
+import { type UsageDetailsByAuthIndex, type UsageDetailsBySource } from '@/utils/usageIndex';
 import styles from '@/pages/AiProvidersPage.module.scss';
 import { CollapsibleModelTags } from '../CollapsibleModelTags';
 import { ProviderList } from '../ProviderList';
 import { ProviderStatusBar } from '../ProviderStatusBar';
-import { getStatsBySource, hasDisableAllModelsRule } from '../utils';
+import {
+  collectUsageDetailsForIdentity,
+  getProviderConfigKey,
+  getStatsForIdentity,
+  hasDisableAllModelsRule,
+} from '../utils';
 
 interface ClaudeSectionProps {
   configs: ProviderKeyConfig[];
   keyStats: KeyStats;
   usageDetailsBySource: UsageDetailsBySource;
+  usageDetailsByAuthIndex: UsageDetailsByAuthIndex;
   loading: boolean;
   disableControls: boolean;
   isSwitching: boolean;
@@ -38,6 +37,7 @@ export function ClaudeSection({
   configs,
   keyStats,
   usageDetailsBySource,
+  usageDetailsByAuthIndex,
   loading,
   disableControls,
   isSwitching,
@@ -53,21 +53,23 @@ export function ClaudeSection({
   const statusBarCache = useMemo(() => {
     const cache = new Map<string, ReturnType<typeof calculateStatusBarData>>();
 
-    configs.forEach((config) => {
+    configs.forEach((config, index) => {
       if (!config.apiKey) return;
-      const candidates = buildCandidateUsageSourceIds({
-        apiKey: config.apiKey,
-        prefix: config.prefix,
-      });
-      if (!candidates.length) return;
+      const configKey = getProviderConfigKey(config, index);
       cache.set(
-        config.apiKey,
-        calculateStatusBarData(collectUsageDetailsForCandidates(usageDetailsBySource, candidates))
+        configKey,
+        calculateStatusBarData(
+          collectUsageDetailsForIdentity(
+            { authIndex: config.authIndex, apiKey: config.apiKey, prefix: config.prefix },
+            usageDetailsBySource,
+            usageDetailsByAuthIndex
+          )
+        )
       );
     });
 
     return cache;
-  }, [configs, usageDetailsBySource]);
+  }, [configs, usageDetailsByAuthIndex, usageDetailsBySource]);
 
   return (
     <>
@@ -87,7 +89,7 @@ export function ClaudeSection({
         <ProviderList<ProviderKeyConfig>
           items={configs}
           loading={loading}
-          keyField={(item) => item.apiKey}
+          keyField={(item, index) => getProviderConfigKey(item, index)}
           emptyTitle={t('ai_providers.claude_empty_title')}
           emptyDescription={t('ai_providers.claude_empty_desc')}
           onEdit={onEdit}
@@ -109,11 +111,15 @@ export function ClaudeSection({
             </div>
           )}
           renderContent={(item, index) => {
-            const stats = getStatsBySource(item.apiKey, keyStats, item.prefix);
+            const stats = getStatsForIdentity(
+              { authIndex: item.authIndex, apiKey: item.apiKey, prefix: item.prefix },
+              keyStats
+            );
             const headerEntries = Object.entries(item.headers || {});
             const configDisabled = hasDisableAllModelsRule(item.excludedModels);
             const excludedModels = item.excludedModels ?? [];
-            const statusData = statusBarCache.get(item.apiKey) || calculateStatusBarData([]);
+            const statusData =
+              statusBarCache.get(getProviderConfigKey(item, index)) || calculateStatusBarData([]);
             const displayName = item.name?.trim() || item.prefix?.trim() || `${t('ai_providers.claude_item_title')} #${index + 1}`;
 
             return (

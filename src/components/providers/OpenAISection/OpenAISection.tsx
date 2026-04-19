@@ -7,22 +7,25 @@ import iconOpenaiLight from '@/assets/icons/openai-light.svg';
 import iconOpenaiDark from '@/assets/icons/openai-dark.svg';
 import type { OpenAIProviderConfig } from '@/types';
 import { maskApiKey } from '@/utils/format';
-import {
-  buildCandidateUsageSourceIds,
-  calculateStatusBarData,
-  type KeyStats,
-} from '@/utils/usage';
-import { collectUsageDetailsForCandidates, type UsageDetailsBySource } from '@/utils/usageIndex';
+import { calculateStatusBarData, type KeyStats } from '@/utils/usage';
+import { type UsageDetailsByAuthIndex, type UsageDetailsBySource } from '@/utils/usageIndex';
 import styles from '@/pages/AiProvidersPage.module.scss';
 import { CollapsibleModelTags } from '../CollapsibleModelTags';
 import { ProviderList } from '../ProviderList';
 import { ProviderStatusBar } from '../ProviderStatusBar';
-import { getOpenAIProviderStats, getStatsBySource } from '../utils';
+import {
+  collectOpenAIProviderUsageDetails,
+  getOpenAIEntryKey,
+  getOpenAIProviderKey,
+  getOpenAIProviderStats,
+  getStatsForIdentity,
+} from '../utils';
 
 interface OpenAISectionProps {
   configs: OpenAIProviderConfig[];
   keyStats: KeyStats;
   usageDetailsBySource: UsageDetailsBySource;
+  usageDetailsByAuthIndex: UsageDetailsByAuthIndex;
   loading: boolean;
   disableControls: boolean;
   isSwitching: boolean;
@@ -36,6 +39,7 @@ export function OpenAISection({
   configs,
   keyStats,
   usageDetailsBySource,
+  usageDetailsByAuthIndex,
   loading,
   disableControls,
   isSwitching,
@@ -50,21 +54,22 @@ export function OpenAISection({
   const statusBarCache = useMemo(() => {
     const cache = new Map<string, ReturnType<typeof calculateStatusBarData>>();
 
-    configs.forEach((provider) => {
-      const sourceIds = new Set<string>();
-      buildCandidateUsageSourceIds({ prefix: provider.prefix }).forEach((id) => sourceIds.add(id));
-      (provider.apiKeyEntries || []).forEach((entry) => {
-        buildCandidateUsageSourceIds({ apiKey: entry.apiKey }).forEach((id) => sourceIds.add(id));
-      });
-
-      const filteredDetails = sourceIds.size
-        ? collectUsageDetailsForCandidates(usageDetailsBySource, sourceIds)
-        : [];
-      cache.set(provider.name, calculateStatusBarData(filteredDetails));
+    configs.forEach((provider, index) => {
+      const providerKey = getOpenAIProviderKey(provider, index);
+      cache.set(
+        providerKey,
+        calculateStatusBarData(
+          collectOpenAIProviderUsageDetails(
+            provider,
+            usageDetailsBySource,
+            usageDetailsByAuthIndex
+          )
+        )
+      );
     });
 
     return cache;
-  }, [configs, usageDetailsBySource]);
+  }, [configs, usageDetailsByAuthIndex, usageDetailsBySource]);
 
   return (
     <>
@@ -88,7 +93,7 @@ export function OpenAISection({
         <ProviderList<OpenAIProviderConfig>
           items={configs}
           loading={loading}
-          keyField={(_, index) => `openai-provider-${index}`}
+          keyField={(item, index) => getOpenAIProviderKey(item, index)}
           containerClassName={styles.providerCardList}
           rowClassName={styles.providerCard}
           metaClassName={styles.providerCardMeta}
@@ -99,10 +104,11 @@ export function OpenAISection({
           onDelete={onDelete}
           actionsDisabled={actionsDisabled}
           renderContent={(item, index) => {
-            const stats = getOpenAIProviderStats(item.apiKeyEntries, keyStats, item.prefix);
+            const stats = getOpenAIProviderStats(item, keyStats);
             const headerEntries = Object.entries(item.headers || {});
             const apiKeyEntries = item.apiKeyEntries || [];
-            const statusData = statusBarCache.get(item.name) || calculateStatusBarData([]);
+            const statusData =
+              statusBarCache.get(getOpenAIProviderKey(item, index)) || calculateStatusBarData([]);
             const displayName = item.name?.trim() || item.prefix?.trim() || `OpenAI #${index + 1}`;
 
             return (
@@ -148,9 +154,15 @@ export function OpenAISection({
                     </div>
                     <div className={styles.apiKeyEntryList}>
                       {apiKeyEntries.map((entry, entryIndex) => {
-                        const entryStats = getStatsBySource(entry.apiKey, keyStats);
+                        const entryStats = getStatsForIdentity(
+                          { authIndex: entry.authIndex, apiKey: entry.apiKey },
+                          keyStats
+                        );
                         return (
-                          <div key={entryIndex} className={styles.apiKeyEntryCard}>
+                          <div
+                            key={getOpenAIEntryKey(entry, entryIndex)}
+                            className={styles.apiKeyEntryCard}
+                          >
                             <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>
                             <span className={styles.apiKeyEntryKey}>{maskApiKey(entry.apiKey)}</span>
                             {entry.proxyUrl && (
