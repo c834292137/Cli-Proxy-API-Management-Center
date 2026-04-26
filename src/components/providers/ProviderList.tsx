@@ -8,15 +8,15 @@ interface ProviderListProps<T> {
   loading: boolean;
   keyField: (item: T, index: number) => string;
   renderContent: (item: T, index: number) => ReactNode;
-  onEdit: (index: number) => void;
-  onDelete: (index: number) => void;
+  onEdit: (item: T, index: number) => void;
+  onDelete: (item: T, index: number) => void;
   emptyTitle: string;
   emptyDescription: string;
   deleteLabel?: string;
   actionsDisabled?: boolean;
   getRowDisabled?: (item: T, index: number) => boolean;
   renderExtraActions?: (item: T, index: number) => ReactNode;
-  containerClassName?: string;
+  listClassName?: string;
   rowClassName?: string;
   metaClassName?: string;
   actionsClassName?: string;
@@ -35,7 +35,7 @@ export function ProviderList<T>({
   actionsDisabled = false,
   getRowDisabled,
   renderExtraActions,
-  containerClassName,
+  listClassName,
   rowClassName,
   metaClassName,
   actionsClassName,
@@ -51,24 +51,21 @@ export function ProviderList<T>({
   }
 
   return (
-    <div className={containerClassName ? `item-list ${containerClassName}` : 'item-list'}>
+    <div className={listClassName ?? 'item-list'}>
       {items.map((item, index) => {
         const rowDisabled = getRowDisabled ? getRowDisabled(item, index) : false;
-        const rowClassNames = ['item-row', rowClassName].filter(Boolean).join(' ');
-        const metaClassNames = ['item-meta', metaClassName].filter(Boolean).join(' ');
-        const actionsClassNames = ['item-actions', actionsClassName].filter(Boolean).join(' ');
         return (
           <div
             key={keyField(item, index)}
-            className={rowClassNames}
+            className={rowClassName ?? 'item-row'}
             style={rowDisabled ? { opacity: 0.6 } : undefined}
           >
-            <div className={metaClassNames}>{renderContent(item, index)}</div>
-            <div className={actionsClassNames}>
+            <div className={metaClassName ?? 'item-meta'}>{renderContent(item, index)}</div>
+            <div className={actionsClassName ?? 'item-actions'}>
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => onEdit(index)}
+                onClick={() => onEdit(item, index)}
                 disabled={actionsDisabled}
               >
                 {t('common.edit')}
@@ -76,7 +73,7 @@ export function ProviderList<T>({
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() => onDelete(index)}
+                onClick={() => onDelete(item, index)}
                 disabled={actionsDisabled}
               >
                 {deleteLabel || t('common.delete')}
