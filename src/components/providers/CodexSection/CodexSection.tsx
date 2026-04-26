@@ -96,7 +96,7 @@ export function CodexSection({
           onDelete={(_, index) => onDelete(index)}
           actionsDisabled={actionsDisabled}
           getRowDisabled={(item) => hasDisableAllModelsRule(item.excludedModels)}
-          containerClassName={styles.providerCardList}
+          listClassName={styles.providerCardList}
           rowClassName={styles.providerCard}
           metaClassName={styles.providerCardMeta}
           actionsClassName={styles.providerCardActions}

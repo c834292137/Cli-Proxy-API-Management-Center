@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import {
   IconCheck,
+  IconChevronDown,
+  IconChevronUp,
   IconSlidersHorizontal,
   IconX,
 } from '@/components/ui/icons';
+import { Select } from '@/components/ui/Select';
+import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import iconOpenaiLight from '@/assets/icons/openai-light.svg';
 import iconOpenaiDark from '@/assets/icons/openai-dark.svg';
 import type { OpenAIProviderConfig } from '@/types';
@@ -36,8 +41,6 @@ interface FloatingToolbarStyle {
   visible: boolean;
 }
 
-const EMPTY_STATUS_BAR = calculateStatusBarData([]);
-
 interface OpenAISectionProps {
   configs: OpenAIProviderConfig[];
   keyStats: KeyStats;
@@ -56,14 +59,6 @@ interface IndexedOpenAIProvider {
   config: OpenAIProviderConfig;
   originalIndex: number;
 }
-
-const getApiKeyEntryRenderKey = (
-  entry: NonNullable<OpenAIProviderConfig['apiKeyEntries']>[number],
-  entryIndex: number
-) => {
-  const authIndex = entry.authIndex == null ? '' : String(entry.authIndex).trim();
-  return authIndex ? `auth-index-${authIndex}` : `api-key-entry-${entryIndex}`;
-};
 
 export function OpenAISection({
   configs,
@@ -561,7 +556,7 @@ export function OpenAISection({
             />
           ) : (
             <ProviderList<OpenAIProviderConfig>
-              items={sortedConfigs.map(({ config, originalIndex }) => config)}
+              items={sortedConfigs.map(({ config }) => config)}
               loading={loading}
               keyField={(item, index) => getOpenAIProviderKey(item, sortedConfigs[index]?.originalIndex ?? index)}
               listClassName={styles.providerCardList}
@@ -570,8 +565,8 @@ export function OpenAISection({
               actionsClassName={styles.providerCardActions}
               emptyTitle={t('ai_providers.openai_empty_title')}
               emptyDescription={t('ai_providers.openai_empty_desc')}
-              onEdit={(item, index) => onEdit(sortedConfigs[index]?.originalIndex ?? index)}
-              onDelete={(item, index) => onDelete(sortedConfigs[index]?.originalIndex ?? index)}
+              onEdit={(_item, index) => onEdit(sortedConfigs[index]?.originalIndex ?? index)}
+              onDelete={(_item, index) => onDelete(sortedConfigs[index]?.originalIndex ?? index)}
               actionsDisabled={actionsDisabled}
               renderContent={(item, index) => {
                 const stats = getOpenAIProviderStats(item, keyStats);
