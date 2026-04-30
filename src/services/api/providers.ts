@@ -148,6 +148,7 @@ const serializeOpenAIProvider = (provider: OpenAIProviderConfig) => {
       : []
   };
   if (provider.prefix?.trim()) payload.prefix = provider.prefix.trim();
+  if (provider.disabled !== undefined) payload.disabled = provider.disabled;
   const headers = serializeHeaders(provider.headers);
   if (headers) payload.headers = headers;
   const models = serializeModelAliases(provider.models);
@@ -229,6 +230,9 @@ export const providersApi = {
 
   updateOpenAIProvider: (index: number, value: OpenAIProviderConfig) =>
     apiClient.patch('/openai-compatibility', { index, value: serializeOpenAIProvider(value) }),
+
+  updateOpenAIProviderDisabled: (index: number, disabled: boolean) =>
+    apiClient.patch('/openai-compatibility', { index, value: { disabled } }),
 
   deleteOpenAIProvider: (name: string) =>
     apiClient.delete(`/openai-compatibility?name=${encodeURIComponent(name)}`),

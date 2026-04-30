@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
+import { Select } from '@/components/ui/Select';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   IconCheck,
   IconChevronDown,
@@ -11,8 +14,6 @@ import {
   IconSlidersHorizontal,
   IconX,
 } from '@/components/ui/icons';
-import { Select } from '@/components/ui/Select';
-import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import iconOpenaiLight from '@/assets/icons/openai-light.svg';
 import iconOpenaiDark from '@/assets/icons/openai-dark.svg';
 import type { OpenAIProviderConfig } from '@/types';
@@ -53,6 +54,7 @@ interface OpenAISectionProps {
   onAdd: () => void;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
+  onToggle: (index: number, enabled: boolean) => void;
 }
 
 interface IndexedOpenAIProvider {
@@ -72,11 +74,13 @@ export function OpenAISection({
   onAdd,
   onEdit,
   onDelete,
+  onToggle,
 }: OpenAISectionProps) {
   const { t } = useTranslation();
   const pageTransitionLayer = usePageTransitionLayer();
   const isTransitionAnimating = pageTransitionLayer?.isAnimating ?? false;
   const actionsDisabled = disableControls || loading || isSwitching;
+  const toggleDisabled = disableControls || loading || isSwitching;
   const [sortOption, setSortOption] = useState<SortOption>('priority');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
@@ -568,6 +572,18 @@ export function OpenAISection({
               onEdit={(_item, index) => onEdit(sortedConfigs[index]?.originalIndex ?? index)}
               onDelete={(_item, index) => onDelete(sortedConfigs[index]?.originalIndex ?? index)}
               actionsDisabled={actionsDisabled}
+              getRowDisabled={(item) => item.disabled === true}
+              renderExtraActions={(item, index) => {
+                const originalIndex = sortedConfigs[index]?.originalIndex ?? index;
+                return (
+                  <ToggleSwitch
+                    label={t('ai_providers.config_toggle_label')}
+                    checked={item.disabled !== true}
+                    disabled={toggleDisabled}
+                    onChange={(value) => void onToggle(originalIndex, value)}
+                  />
+                );
+              }}
               renderContent={(item, index) => {
                 const stats = getOpenAIProviderStats(item, keyStats);
                 const headerEntries = Object.entries(item.headers || {});
@@ -604,6 +620,11 @@ export function OpenAISection({
                       <span className={styles.fieldLabel}>{t('common.base_url')}:</span>
                       <span className={styles.fieldValue}>{item.baseUrl}</span>
                     </div>
+                    {item.disabled === true && (
+                      <div className="status-badge warning" style={{ marginTop: 8, marginBottom: 0 }}>
+                        {t('ai_providers.config_disabled_badge')}
+                      </div>
+                    )}
                     {headerEntries.length > 0 && (
                       <div className={styles.headerBadgeList}>
                         {headerEntries.map(([key, value]) => (
