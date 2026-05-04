@@ -5,25 +5,23 @@ import { Card } from '@/components/ui/Card';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import iconGemini from '@/assets/icons/gemini.svg';
 import type { GeminiKeyConfig } from '@/types';
-import { maskApiKey } from '@/utils/format';
-import { calculateStatusBarData, type KeyStats } from '@/utils/usage';
-import { type UsageDetailsByAuthIndex, type UsageDetailsBySource } from '@/utils/usageIndex';
+import { maskApiKey, maskHeaderValue } from '@/utils/format';
+import { statusBarDataFromRecentRequests } from '@/utils/recentRequests';
 import styles from '@/pages/AiProvidersPage.module.scss';
 import { CollapsibleModelTags } from '../CollapsibleModelTags';
 import { ProviderList } from '../ProviderList';
 import { ProviderStatusBar } from '../ProviderStatusBar';
 import {
-  collectUsageDetailsForIdentity,
   getProviderConfigKey,
-  getStatsForIdentity,
+  getProviderRecentBuckets,
+  getProviderTotalStats,
   hasDisableAllModelsRule,
+  type ProviderRecentUsageMap,
 } from '../utils';
 
 interface GeminiSectionProps {
   configs: GeminiKeyConfig[];
-  keyStats: KeyStats;
-  usageDetailsBySource: UsageDetailsBySource;
-  usageDetailsByAuthIndex: UsageDetailsByAuthIndex;
+  usageByProvider: ProviderRecentUsageMap;
   loading: boolean;
   disableControls: boolean;
   isSwitching: boolean;
@@ -35,9 +33,7 @@ interface GeminiSectionProps {
 
 export function GeminiSection({
   configs,
-  keyStats,
-  usageDetailsBySource,
-  usageDetailsByAuthIndex,
+  usageByProvider,
   loading,
   disableControls,
   isSwitching,
@@ -51,25 +47,21 @@ export function GeminiSection({
   const toggleDisabled = disableControls || loading || isSwitching;
 
   const statusBarCache = useMemo(() => {
-    const cache = new Map<string, ReturnType<typeof calculateStatusBarData>>();
+    const cache = new Map<string, ReturnType<typeof statusBarDataFromRecentRequests>>();
 
     configs.forEach((config, index) => {
       if (!config.apiKey) return;
       const configKey = getProviderConfigKey(config, index);
       cache.set(
         configKey,
-        calculateStatusBarData(
-          collectUsageDetailsForIdentity(
-            { authIndex: config.authIndex, apiKey: config.apiKey, prefix: config.prefix },
-            usageDetailsBySource,
-            usageDetailsByAuthIndex
-          )
+        statusBarDataFromRecentRequests(
+          getProviderRecentBuckets(usageByProvider, 'gemini', config.apiKey, config.baseUrl)
         )
       );
     });
 
     return cache;
-  }, [configs, usageDetailsByAuthIndex, usageDetailsBySource]);
+  }, [configs, usageByProvider]);
 
   return (
     <>
@@ -111,16 +103,22 @@ export function GeminiSection({
             </div>
           )}
           renderContent={(item, index) => {
-            const stats = getStatsForIdentity(
-              { authIndex: item.authIndex, apiKey: item.apiKey, prefix: item.prefix },
-              keyStats
+            const stats = getProviderTotalStats(
+              usageByProvider,
+              'gemini',
+              item.apiKey,
+              item.baseUrl
             );
             const headerEntries = Object.entries(item.headers || {});
             const configDisabled = hasDisableAllModelsRule(item.excludedModels);
             const excludedModels = item.excludedModels ?? [];
             const statusData =
-              statusBarCache.get(getProviderConfigKey(item, index)) || calculateStatusBarData([]);
-            const displayName = item.name?.trim() || item.prefix?.trim() || `${t('ai_providers.gemini_item_title')} #${index + 1}`;
+              statusBarCache.get(getProviderConfigKey(item, index)) ||
+              statusBarDataFromRecentRequests([]);
+            const displayName =
+              item.name?.trim() ||
+              item.prefix?.trim() ||
+              `${t('ai_providers.gemini_item_title')} #${index + 1}`;
 
             return (
               <Fragment>
@@ -165,7 +163,7 @@ export function GeminiSection({
                   <div className={styles.headerBadgeList}>
                     {headerEntries.map(([key, value]) => (
                       <span key={key} className={styles.headerBadge}>
-                        <strong>{key}:</strong> {value}
+                        <strong>{key}:</strong> {maskHeaderValue(key, value)}
                       </span>
                     ))}
                   </div>

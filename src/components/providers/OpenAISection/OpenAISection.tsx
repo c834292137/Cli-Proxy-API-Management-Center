@@ -17,19 +17,21 @@ import {
 import iconOpenaiLight from '@/assets/icons/openai-light.svg';
 import iconOpenaiDark from '@/assets/icons/openai-dark.svg';
 import type { OpenAIProviderConfig } from '@/types';
-import { maskApiKey } from '@/utils/format';
-import { calculateStatusBarData, type KeyStats } from '@/utils/usage';
-import { type UsageDetailsByAuthIndex, type UsageDetailsBySource } from '@/utils/usageIndex';
+import { maskApiKey, maskHeaderValue } from '@/utils/format';
+import { statusBarDataFromRecentRequests } from '@/utils/recentRequests';
 import styles from '@/pages/AiProvidersPage.module.scss';
 import { CollapsibleModelTags } from '../CollapsibleModelTags';
 import { ProviderList } from '../ProviderList';
 import { ProviderStatusBar } from '../ProviderStatusBar';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import {
-  collectOpenAIProviderUsageDetails,
+  getOpenAIProviderRecentWindowStats,
+  getOpenAIProviderRecentStatusData,
+  getOpenAIProviderTotalStats,
   getOpenAIProviderKey,
-  getOpenAIProviderStats,
-  getStatsForIdentity,
+  getOpenAIEntryKey,
+  getProviderTotalStats,
+  type ProviderRecentUsageMap,
 } from '../utils';
 
 type SortOption = 'name' | 'priority' | 'recent-success';
@@ -42,11 +44,11 @@ interface FloatingToolbarStyle {
   visible: boolean;
 }
 
+const EMPTY_STATUS_BAR = statusBarDataFromRecentRequests([]);
+
 interface OpenAISectionProps {
   configs: OpenAIProviderConfig[];
-  keyStats: KeyStats;
-  usageDetailsBySource: UsageDetailsBySource;
-  usageDetailsByAuthIndex: UsageDetailsByAuthIndex;
+  usageByProvider: ProviderRecentUsageMap;
   loading: boolean;
   disableControls: boolean;
   isSwitching: boolean;
@@ -64,9 +66,7 @@ interface IndexedOpenAIProvider {
 
 export function OpenAISection({
   configs,
-  keyStats,
-  usageDetailsBySource,
-  usageDetailsByAuthIndex,
+  usageByProvider,
   loading,
   disableControls,
   isSwitching,
@@ -245,20 +245,15 @@ export function OpenAISection({
     : t('ai_providers.model_search_placeholder');
 
   const statusBarCache = useMemo(() => {
-    const cache = new Map<string, ReturnType<typeof calculateStatusBarData>>();
+    const cache = new Map<string, ReturnType<typeof statusBarDataFromRecentRequests>>();
 
     configs.forEach((provider, index) => {
       const providerKey = getOpenAIProviderKey(provider, index);
-      cache.set(
-        providerKey,
-        calculateStatusBarData(
-          collectOpenAIProviderUsageDetails(provider, usageDetailsBySource, usageDetailsByAuthIndex)
-        )
-      );
+      cache.set(providerKey, getOpenAIProviderRecentStatusData(provider, usageByProvider));
     });
 
     return cache;
-  }, [configs, usageDetailsByAuthIndex, usageDetailsBySource]);
+  }, [configs, usageByProvider]);
 
   const sortOptions = useMemo(
     () => [
@@ -280,7 +275,12 @@ export function OpenAISection({
     const direction = sortDirection === 'desc' ? -1 : 1;
     const providerStats =
       sortOption === 'recent-success'
-        ? new Map(sorted.map(({ config }) => [config, getOpenAIProviderStats(config, keyStats)]))
+        ? new Map(
+            sorted.map(({ config }) => [
+              config,
+              getOpenAIProviderRecentWindowStats(config, usageByProvider),
+            ])
+          )
         : null;
 
     switch (sortOption) {
@@ -318,7 +318,7 @@ export function OpenAISection({
     }
 
     return sorted;
-  }, [configs, sortOption, sortDirection, keyStats, selectedModels]);
+  }, [configs, sortOption, sortDirection, usageByProvider, selectedModels]);
 
   const toggleModelSelection = (modelName: string) => {
     setSelectedModels((prev) => {
@@ -519,14 +519,6 @@ export function OpenAISection({
     </span>
   );
 
-  const getOpenAIEntryKey = (
-    entry: NonNullable<OpenAIProviderConfig['apiKeyEntries']>[number],
-    entryIndex: number
-  ) => {
-    const authIndex = entry.authIndex == null ? '' : String(entry.authIndex).trim();
-    return authIndex ? `auth-index-${authIndex}` : `api-key-entry-${entryIndex}`;
-  };
-
   return (
     <>
       <div ref={sectionRef}>
@@ -585,12 +577,12 @@ export function OpenAISection({
                 );
               }}
               renderContent={(item, index) => {
-                const stats = getOpenAIProviderStats(item, keyStats);
+                const stats = getOpenAIProviderTotalStats(item, usageByProvider);
                 const headerEntries = Object.entries(item.headers || {});
                 const apiKeyEntries = item.apiKeyEntries || [];
                 const originalIndex = sortedConfigs[index]?.originalIndex ?? index;
                 const statusData =
-                  statusBarCache.get(getOpenAIProviderKey(item, originalIndex)) || calculateStatusBarData([]);
+                  statusBarCache.get(getOpenAIProviderKey(item, originalIndex)) || EMPTY_STATUS_BAR;
                 const displayName = item.name?.trim() || item.prefix?.trim() || `OpenAI #${originalIndex + 1}`;
 
                 return (
@@ -629,17 +621,23 @@ export function OpenAISection({
                       <div className={styles.headerBadgeList}>
                         {headerEntries.map(([key, value]) => (
                           <span key={key} className={styles.headerBadge}>
-                            <strong>{key}:</strong> {value}
+                            <strong>{key}:</strong> {maskHeaderValue(key, value)}
                           </span>
                         ))}
                       </div>
                     )}
                     {apiKeyEntries.length > 0 && (
-                      <div className={styles.apiKeyEntryList}>
+                      <div className={styles.apiKeyEntriesSection}>
+                        <div className={styles.apiKeyEntriesLabel}>
+                          {t('ai_providers.openai_keys_count')}: {apiKeyEntries.length}
+                        </div>
+                        <div className={styles.apiKeyEntryList}>
                         {apiKeyEntries.map((entry, entryIndex) => {
-                          const entryStats = getStatsForIdentity(
-                            { authIndex: entry.authIndex, apiKey: entry.apiKey },
-                            keyStats
+                          const entryStats = getProviderTotalStats(
+                            usageByProvider,
+                            item.name,
+                            entry.apiKey,
+                            item.baseUrl
                           );
                           return (
                             <div
@@ -666,6 +664,7 @@ export function OpenAISection({
                             </div>
                           );
                         })}
+                        </div>
                       </div>
                     )}
                     <div className={styles.fieldRow} style={{ marginTop: '8px' }}>
@@ -677,7 +676,7 @@ export function OpenAISection({
                     ) : null}
                     {item.testModel && (
                       <div className={styles.fieldRow}>
-                        <span className={styles.fieldLabel}>Test Model:</span>
+                        <span className={styles.fieldLabel}>{t('ai_providers.openai_test_model')}:</span>
                         <span className={styles.fieldValue}>{item.testModel}</span>
                       </div>
                     )}

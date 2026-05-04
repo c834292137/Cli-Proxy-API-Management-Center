@@ -32,6 +32,15 @@ export function maskApiKey(key: string): string {
   return `${start}${masked}${end}`;
 }
 
+const SENSITIVE_HEADER_PATTERN = /(?:^|[-_])(authorization|api[-_]?key|token|secret|cookie|session|credential|password|proxy[-_]?authorization)(?:$|[-_])/i;
+
+export function maskHeaderValue(name: string, value: unknown): string {
+  const text = String(value ?? '');
+  if (!text) return '';
+
+  return SENSITIVE_HEADER_PATTERN.test(name) ? maskApiKey(text) : text;
+}
+
 /**
  * 格式化文件大小
  */

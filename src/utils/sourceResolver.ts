@@ -1,6 +1,7 @@
 import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
 import type { CredentialInfo, SourceInfo } from '@/types/sourceInfo';
-import { buildCandidateUsageSourceIds, normalizeAuthIndex } from '@/utils/usage';
+import { buildCandidateUsageSourceIds } from '@/utils/usage';
+import { normalizeAuthIndex } from '@/utils/authIndex';
 
 export interface SourceInfoMapInput {
   geminiApiKeys?: GeminiKeyConfig[];
